@@ -85,11 +85,7 @@ class _MyHomePageState extends State<MyHomePage> {
     });
     _web3Client = web3Client;
 
-    final balance = await _getBalance(address);
-
-    setState(() {
-      _balance = balance;
-    });
+    _getBalance(address);
 
     if (kDebugMode) {
       print('你的私钥：${bytesToHex(intToBytes(privateKey.value))}');
@@ -128,12 +124,14 @@ class _MyHomePageState extends State<MyHomePage> {
     return Web3Client(apiUrl, Client());
   }
 
-  Future<String> _getBalance(String address) async {
+  void _getBalance(String address) async {
     final balance =
         await _web3Client.getBalance(EthereumAddress.fromHex(address));
     final ether = balance.getValueInUnit(EtherUnit.ether);
 
-    return ether.toStringAsFixed(5);
+    setState(() {
+      _balance = ether.toStringAsFixed(5);
+    });
   }
 
   void _sendTransaction() async {
@@ -155,14 +153,7 @@ class _MyHomePageState extends State<MyHomePage> {
       chainId: chainId.toInt(),
     );
     showAlertDialog();
-    _refreshBalance();
-  }
-
-  void _refreshBalance() async {
-    final balance = await _getBalance(_address);
-    setState(() {
-      _balance = balance;
-    });
+    _getBalance(_address);
   }
 
   void showAlertDialog() {
@@ -240,7 +231,7 @@ class _MyHomePageState extends State<MyHomePage> {
             Column(
               children: [
                 ElevatedButton(
-                  onPressed: _refreshBalance,
+                  onPressed: () => _getBalance(_address),
                   child: const Text('获取余额'),
                 ),
                 ElevatedButton(
