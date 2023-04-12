@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart';
 import 'package:sp_util/sp_util.dart';
 import 'package:web3dart/crypto.dart';
@@ -8,8 +9,8 @@ import 'package:wallet/wallet.dart' as wallet;
 import 'dart:math' as math;
 
 // const String apiUrl = 'http://localhost:7545';
-const String API_URL =
-    'https://eth-sepolia.g.alchemy.com/v2/yhAmHr1Wks6n565P1FUhNcHnNx9qstYx';
+// const String API_URL = 'https://eth-sepolia.g.alchemy.com/v2/yhAmHr1Wks6n565P1FUhNcHnNx9qstYx';
+const String API_URL = 'https://data-seed-prebsc-1-s1.binance.org:8545';
 
 const String WALLET_PATH = "m/44'/60'/0'/0/0"; // 钱包的派生路径
 const String WALLET_PATH2 = "m/44'/60'/0'/0/1"; // 钱包的派生路径
@@ -156,6 +157,175 @@ class _MyHomePageState extends State<MyHomePage> {
     _getBalance(_address);
   }
 
+  Future<String> _getLocalJson(String jsonName) async {
+    final json =
+        await rootBundle.loadString("assets/abi/" + jsonName + ".json");
+    return json;
+  }
+
+  void _swap() async {
+    /// TODO
+    // final chainId = await _web3Client.getChainId();
+    final jackRouter = await _getLocalJson('jackRouter');
+    final erc20 = await _getLocalJson('erc20');
+    final jackFactory = await _getLocalJson('jackFactory');
+    final jackPair = await _getLocalJson('jackPair');
+
+    final jackRouterContract = DeployedContract(
+      ContractAbi.fromJson(jackRouter, 'jackRouter'),
+      EthereumAddress.fromHex('0x10ED43C718714eb63d5aA57B78B54704E256024E'),
+    );
+    final erc20Contract = DeployedContract(
+      ContractAbi.fromJson(erc20, 'erc20'),
+      EthereumAddress.fromHex('0x8f92eB3b8d0D91d4F8924a041Ad94a6b6A67E5e9'),
+    );
+    final jackFactoryContract = DeployedContract(
+      ContractAbi.fromJson(jackFactory, 'jackFactory'),
+      EthereumAddress.fromHex('0x6725f303b657a9451d8ba641348b6761a6cc7a17'),
+    );
+
+    /// 查询授权
+    final allowanceErc20 = await _web3Client.call(
+      contract: erc20Contract,
+      function: erc20Contract.function('allowance'),
+      params: [
+        EthereumAddress.fromHex('0x622b7352BD13Df3216368e36d421fF9611A1a363'),
+        EthereumAddress.fromHex('0xd99d1c33f9fc3444f8101754abc46c52416550d1'),
+      ],
+    );
+
+    print('allowanceErc20: ${allowanceErc20}');
+
+    final estimateGas = await _web3Client.estimateGas();
+
+    print('estimateGas: ${estimateGas}');
+
+
+    // final addLiquidity = await _web3Client.call(
+    //   contract: jackRouterContract,
+    //   function: jackRouterContract.function('addLiquidity'),
+    //   params: [
+    //     EthereumAddress.fromHex('0x8f92eB3b8d0D91d4F8924a041Ad94a6b6A67E5e9'),
+    //     EthereumAddress.fromHex('0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd'),
+    //     estimateGas,
+    //     estimateGas,
+    //     estimateGas,
+    //     estimateGas,
+    //     EthereumAddress.fromHex('0xd99d1c33f9fc3444f8101754abc46c52416550d1'),
+    //     BigInt.from(
+    //         DateTime.now().add(const Duration(days: 1)).millisecondsSinceEpoch),
+    //   ],
+    // );
+
+    // print('addLiquidity: ${addLiquidity}');
+
+    final approveTx = await _web3Client.call(
+      contract: erc20Contract,
+      function: erc20Contract.function('approve'),
+      params: [
+        EthereumAddress.fromHex('0xd99d1c33f9fc3444f8101754abc46c52416550d1'),
+        estimateGas
+      ],
+    );
+
+    print('Transaction hash: ${approveTx[0].hash}');
+
+    return;
+
+    // final approveReceipt = await approveTx[0].wait();
+    // print('approveReceipt: $approveReceipt');
+
+    final pairAddress = await _web3Client.call(
+      contract: jackFactoryContract,
+      function: jackFactoryContract.function('getPair'),
+      params: [
+        EthereumAddress.fromHex('0x10ED43C718714eb63d5aA57B78B54704E256024E'),
+        EthereumAddress.fromHex('0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd'),
+      ],
+    );
+    final jackPairContract = DeployedContract(
+      ContractAbi.fromJson(jackPair, 'jackPair'),
+      EthereumAddress.fromHex(pairAddress[0]),
+    );
+
+    final reserves = await _web3Client.call(
+      contract: jackPairContract,
+      function: jackPairContract.function('getReserves'),
+      params: [],
+    );
+
+    print('reserves: ${reserves}');
+
+    const usdtAmount = 10;
+    final amountInWei = EtherAmount.fromUnitAndValue(
+      EtherUnit.wei,
+      BigInt.from(usdtAmount * math.pow(10, 18)),
+    );
+
+    final swapTx = await _web3Client.call(
+      contract: jackRouterContract,
+      function: jackRouterContract.function('swapExactTokensForTokens'),
+      params: [
+        amountInWei,
+        BigInt.from(0),
+        [
+          EthereumAddress.fromHex('0x8f92eB3b8d0D91d4F8924a041Ad94a6b6A67E5e9'),
+          EthereumAddress.fromHex('0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd'),
+        ],
+        EthereumAddress.fromHex('0x622b7352BD13Df3216368e36d421fF9611A1a363'),
+        BigInt.from(
+            DateTime.now().add(const Duration(days: 1)).millisecondsSinceEpoch),
+      ],
+    );
+
+    print('Transaction hash: ${swapTx[0].hash}');
+    final swapReceipt = await swapTx[0].wait();
+    print('swapReceipt: $swapReceipt');
+
+    // await _web3Client.sendTransaction(
+    //   EthPrivateKey.fromInt(_privateKey.value),
+    //   Transaction.callContract(
+    //     contract: jackRouterContract,
+    //     function: jackRouterContract.function('swapExactTokensForTokens'),
+    //     parameters: [
+    //       amountInWei,
+    //     BigInt.from(0),
+    //       [
+    //         EthereumAddress.fromHex(
+    //             '0x8f92eB3b8d0D91d4F8924a041Ad94a6b6A67E5e9'),
+    //         EthereumAddress.fromHex(
+    //             '0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd'),
+    //       ],
+    //       EthereumAddress.fromHex('0x622b7352BD13Df3216368e36d421fF9611A1a363'),
+    //       BigInt.from(DateTime.now()
+    //           .add(const Duration(days: 1))
+    //           .millisecondsSinceEpoch),
+    //     ],
+    //     value: amountInWei,
+    //   ),
+    //   chainId: chainId.toInt(),
+    // );
+    showAlertDialog();
+    _getBalance(_address);
+  }
+
+  void _getTokensBalance() async {
+    final erc20 = await _getLocalJson('erc20');
+    final contract = DeployedContract(
+      ContractAbi.fromJson(erc20, 'erc20'),
+      EthereumAddress.fromHex('0x8f92eB3b8d0D91d4F8924a041Ad94a6b6A67E5e9'),
+    );
+    final balance = await _web3Client.call(
+      contract: contract,
+      function: contract.function('balanceOf'),
+      params: [
+        EthereumAddress.fromHex('0x622b7352BD13Df3216368e36d421fF9611A1a363')
+      ],
+    );
+
+    print('balance ----- ${balance[0] / BigInt.from(math.pow(10, 18))}');
+  }
+
   void showAlertDialog() {
     showDialog<void>(
       context: context,
@@ -237,6 +407,14 @@ class _MyHomePageState extends State<MyHomePage> {
                 ElevatedButton(
                   onPressed: _sendTransaction,
                   child: const Text('转出'),
+                ),
+                ElevatedButton(
+                  onPressed: _swap,
+                  child: const Text('转换'),
+                ),
+                ElevatedButton(
+                  onPressed: _getTokensBalance,
+                  child: const Text('获取代币余额'),
                 ),
               ],
             ),
