@@ -87,6 +87,7 @@ class _MyHomePageState extends State<MyHomePage> {
     _web3Client = web3Client;
 
     _getBalance(address);
+    _getTokensBalance();
 
     if (kDebugMode) {
       print('你的私钥：${bytesToHex(intToBytes(privateKey.value))}');
@@ -163,7 +164,122 @@ class _MyHomePageState extends State<MyHomePage> {
     return json;
   }
 
-  void _swap() async {
+  void _swapExactETHForTokens() async {
+    /// TODO
+    final chainId = await _web3Client.getChainId();
+    final jackRouter = await _getLocalJson('jackRouter');
+    final erc20 = await _getLocalJson('erc20');
+    final jackFactory = await _getLocalJson('jackFactory');
+    final jackPair = await _getLocalJson('jackPair');
+
+    final jackRouterContract = DeployedContract(
+      ContractAbi.fromJson(jackRouter, 'jackRouter'),
+      EthereumAddress.fromHex('0xd99d1c33f9fc3444f8101754abc46c52416550d1'),
+    );
+    final jackFactoryContract = DeployedContract(
+      ContractAbi.fromJson(jackFactory, 'jackFactory'),
+      EthereumAddress.fromHex('0x6725f303b657a9451d8ba641348b6761a6cc7a17'),
+    );
+
+    /// 获取交易对地址
+    final pairAddress = await _web3Client.call(
+      contract: jackFactoryContract,
+      function: jackFactoryContract.function('getPair'),
+      params: [
+        EthereumAddress.fromHex('0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd'),
+        EthereumAddress.fromHex('0x8f92eB3b8d0D91d4F8924a041Ad94a6b6A67E5e9'),
+      ],
+    );
+    print('pairAddress: ${pairAddress}');
+
+    /// 获取交易对合约
+    final jackPairContract = DeployedContract(
+      ContractAbi.fromJson(jackPair, 'jackPair'),
+      pairAddress[0],
+    );
+
+    print('pairAddress: ${jackPairContract}');
+
+    /// 获取交易对储备
+    final reserves = await _web3Client.call(
+      contract: jackPairContract,
+      function: jackPairContract.function('getReserves'),
+      params: [],
+    );
+
+    print('reserves: ${reserves}');
+
+    final amountIn = EtherAmount.fromUnitAndValue(
+      EtherUnit.wei,
+      BigInt.from(0.01 * math.pow(10, 18)),
+    );
+
+    final amountOutMin = BigInt.from(100 * math.pow(10, 18));
+    print('amountOutMin: ${amountOutMin}');
+    // try {
+    //   final tx = await _web3Client.call(
+    //     contract: jackRouterContract,
+    //     function: jackRouterContract.function('swapExactETHForTokens'),
+    //     params: [
+    //       amountOutMin,
+    //       [
+    //         EthereumAddress.fromHex(
+    //             '0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd'),
+    //         EthereumAddress.fromHex(
+    //             '0x8f92eB3b8d0D91d4F8924a041Ad94a6b6A67E5e9'),
+    //       ],
+    //       EthereumAddress.fromHex('0x622b7352BD13Df3216368e36d421fF9611A1a363'),
+    //       BigInt.from(DateTime.now()
+    //           .add(const Duration(minutes: 20))
+    //           .millisecondsSinceEpoch),
+    //     ],
+    //   );
+    //   print('Transaction hash: ${tx[0].hash}');
+    //   final swapReceipt = await tx[0].wait();
+    //   print('swapReceipt: $swapReceipt');
+    // } catch (error, trace) {
+    //   print(error);
+    //   print(trace);
+    // }
+    try {
+      final tx = await _web3Client.sendTransaction(
+        EthPrivateKey.fromInt(_privateKey.value),
+        Transaction.callContract(
+          contract: jackRouterContract,
+          function: jackRouterContract.function('swapExactETHForTokens'),
+          parameters: [
+            amountOutMin,
+            [
+              EthereumAddress.fromHex(
+                  '0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd'),
+              EthereumAddress.fromHex(
+                  '0x8f92eB3b8d0D91d4F8924a041Ad94a6b6A67E5e9'),
+            ],
+            EthereumAddress.fromHex(
+                '0x622b7352BD13Df3216368e36d421fF9611A1a363'),
+            BigInt.from(DateTime.now()
+                .add(const Duration(minutes: 20))
+                .millisecondsSinceEpoch),
+          ],
+          value: amountIn,
+        ),
+        chainId: chainId.toInt(),
+      );
+      // pairAddress: [0x284a7b83a10b0d91dc64ab04574507294fbf2acd]
+      // reserves: [10891949504848443278689669, 745497565636525320, 1680942752]
+      //  amountOutMin: 7766279631452241920
+      // Transaction hash: 0x55df6b6e7134040721b9e34ae44e12409420e696f89638d5b2ce2c5caba3b1df
+      // balance ----- 143984.69095942142
+      print('Transaction hash: $tx');
+    } catch (error, trace) {
+      print(error);
+      print(trace);
+    }
+    showAlertDialog();
+    _getBalance(_address);
+  }
+
+  void _swapExactTokensForTokens() async {
     /// TODO
     // final chainId = await _web3Client.getChainId();
     final jackRouter = await _getLocalJson('jackRouter');
@@ -199,7 +315,6 @@ class _MyHomePageState extends State<MyHomePage> {
     final estimateGas = await _web3Client.estimateGas();
 
     print('estimateGas: ${estimateGas}');
-
 
     // final addLiquidity = await _web3Client.call(
     //   contract: jackRouterContract,
@@ -409,8 +524,12 @@ class _MyHomePageState extends State<MyHomePage> {
                   child: const Text('转出'),
                 ),
                 ElevatedButton(
-                  onPressed: _swap,
-                  child: const Text('转换'),
+                  onPressed: _swapExactETHForTokens,
+                  child: const Text('swapExactETHForTokens'),
+                ),
+                ElevatedButton(
+                  onPressed: _swapExactTokensForTokens,
+                  child: const Text('swapExactTokensForTokens'),
                 ),
                 ElevatedButton(
                   onPressed: _getTokensBalance,
