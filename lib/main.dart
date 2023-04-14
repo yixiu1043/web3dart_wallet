@@ -16,6 +16,14 @@ const String WALLET_PATH = "m/44'/60'/0'/0/0"; // 钱包的派生路径
 const String WALLET_PATH2 = "m/44'/60'/0'/0/1"; // 钱包的派生路径
 const String WALLET_PATH3 = "m/44'/60'/0'/0/1"; // 钱包的派生路径
 
+const PancakeFactoryAddress = '0x5160f2454FcF4FC0bA5753dA1692f456fDeA5A59';
+const PancakeRouterAddress = '0x53968F853bA4413e9EE9ADA14935ee77Fece1027';
+const PancakePairAddress = '0x7220599c32a6B6D1D11488CC552f8799E6EcF53E';
+const WBNBAddress = '0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd';
+const USDTAddress = '0x337610d27c682E347C9cD60BD4b3b107C9d34dDd';
+const ERC20Address = '0x377533D0E68A22CF180205e9c9ed980f74bc5050';
+const WalletAddress = '0x622b7352BD13Df3216368e36d421fF9611A1a363';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SpUtil.getInstance();
@@ -160,66 +168,70 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<String> _getLocalJson(String jsonName) async {
     final json =
-        await rootBundle.loadString("assets/abi/" + jsonName + ".json");
+        await rootBundle.loadString("assets/abi1/$jsonName.json");
     return json;
   }
 
   void _swapExactETHForTokens() async {
     /// TODO
     final chainId = await _web3Client.getChainId();
-    final jackRouter = await _getLocalJson('jackRouter');
-    final erc20 = await _getLocalJson('erc20');
-    final jackFactory = await _getLocalJson('jackFactory');
-    final jackPair = await _getLocalJson('jackPair');
+    final pancakeFactory = await _getLocalJson('PancakeFactory');
+    final pancakeRouterAbi = await _getLocalJson('PancakeRouter');
+    final pancakePair = await _getLocalJson('PancakePairAddress');
 
-    final jackRouterContract = DeployedContract(
-      ContractAbi.fromJson(jackRouter, 'jackRouter'),
-      EthereumAddress.fromHex('0xd99d1c33f9fc3444f8101754abc46c52416550d1'),
+    final pancakeFactoryContract = DeployedContract(
+      ContractAbi.fromJson(pancakeFactory, 'PancakeFactory'),
+      EthereumAddress.fromHex(PancakeFactoryAddress),
     );
-    final jackFactoryContract = DeployedContract(
-      ContractAbi.fromJson(jackFactory, 'jackFactory'),
-      EthereumAddress.fromHex('0x6725f303b657a9451d8ba641348b6761a6cc7a17'),
+    final pancakeRouterContract = DeployedContract(
+      ContractAbi.fromJson(pancakeRouterAbi, 'PancakeRouter'),
+      EthereumAddress.fromHex(PancakeRouterAddress),
+    );
+
+    final pancakePairContract = DeployedContract(
+      ContractAbi.fromJson(pancakePair, 'PancakePair'),
+      EthereumAddress.fromHex(PancakePairAddress),
     );
 
     /// 获取交易对地址
     final pairAddress = await _web3Client.call(
-      contract: jackFactoryContract,
-      function: jackFactoryContract.function('getPair'),
+      contract: pancakeFactoryContract,
+      function: pancakeFactoryContract.function('getPair'),
       params: [
-        EthereumAddress.fromHex('0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd'),
-        EthereumAddress.fromHex('0x8f92eB3b8d0D91d4F8924a041Ad94a6b6A67E5e9'),
+        EthereumAddress.fromHex(WBNBAddress),
+        EthereumAddress.fromHex(USDTAddress),
       ],
     );
     print('pairAddress: ${pairAddress}');
 
-    /// 获取交易对合约
-    final jackPairContract = DeployedContract(
-      ContractAbi.fromJson(jackPair, 'jackPair'),
-      pairAddress[0],
-    );
-
-    print('pairAddress: ${jackPairContract}');
+    // /// 获取交易对合约
+    // final jackPairContract = DeployedContract(
+    //   ContractAbi.fromJson(jackPair, 'jackPair'),
+    //   pairAddress[0],
+    // );
+    //
+    // print('pairAddress: ${jackPairContract}');
+    //
 
     /// 获取交易对储备
-    final reserves = await _web3Client.call(
-      contract: jackPairContract,
-      function: jackPairContract.function('getReserves'),
-      params: [],
-    );
+    // final reserves = await _web3Client.call(
+    //   contract: jackPairContract,
+    //   function: jackPairContract.function('getReserves'),
+    //   params: [],
+    // );
 
-    print('reserves: ${reserves}');
-
-    final amountIn = EtherAmount.fromUnitAndValue(
-      EtherUnit.wei,
-      BigInt.from(0.01 * math.pow(10, 18)),
+    return;
+    final amountIn = EtherAmount.fromBigInt(
+      EtherUnit.ether,
+      BigInt.from(0.01),
     );
 
     final amountOutMin = BigInt.from(100 * math.pow(10, 18));
     print('amountOutMin: ${amountOutMin}');
     // try {
     //   final tx = await _web3Client.call(
-    //     contract: jackRouterContract,
-    //     function: jackRouterContract.function('swapExactETHForTokens'),
+    //     contract: pancakeRouterContract,
+    //     function: pancakeRouterContract.function('swapExactETHForTokens'),
     //     params: [
     //       amountOutMin,
     //       [
@@ -245,8 +257,8 @@ class _MyHomePageState extends State<MyHomePage> {
       final tx = await _web3Client.sendTransaction(
         EthPrivateKey.fromInt(_privateKey.value),
         Transaction.callContract(
-          contract: jackRouterContract,
-          function: jackRouterContract.function('swapExactETHForTokens'),
+          contract: pancakeRouterContract,
+          function: pancakeRouterContract.function('swapExactETHForTokens'),
           parameters: [
             amountOutMin,
             [
@@ -282,21 +294,21 @@ class _MyHomePageState extends State<MyHomePage> {
   void _swapExactTokensForTokens() async {
     /// TODO
     // final chainId = await _web3Client.getChainId();
-    final jackRouter = await _getLocalJson('jackRouter');
+    final pancakeRouter = await _getLocalJson('PancakeRouter');
     final erc20 = await _getLocalJson('erc20');
-    final jackFactory = await _getLocalJson('jackFactory');
+    final pancakeFactory = await _getLocalJson('PancakeFactory');
     final jackPair = await _getLocalJson('jackPair');
 
-    final jackRouterContract = DeployedContract(
-      ContractAbi.fromJson(jackRouter, 'jackRouter'),
+    final pancakeRouterContract = DeployedContract(
+      ContractAbi.fromJson(pancakeRouter, 'PancakeRouter'),
       EthereumAddress.fromHex('0x10ED43C718714eb63d5aA57B78B54704E256024E'),
     );
     final erc20Contract = DeployedContract(
       ContractAbi.fromJson(erc20, 'erc20'),
       EthereumAddress.fromHex('0x8f92eB3b8d0D91d4F8924a041Ad94a6b6A67E5e9'),
     );
-    final jackFactoryContract = DeployedContract(
-      ContractAbi.fromJson(jackFactory, 'jackFactory'),
+    final pancakeFactoryContract = DeployedContract(
+      ContractAbi.fromJson(pancakeFactory, 'PancakeFactory'),
       EthereumAddress.fromHex('0x6725f303b657a9451d8ba641348b6761a6cc7a17'),
     );
 
@@ -317,8 +329,8 @@ class _MyHomePageState extends State<MyHomePage> {
     print('estimateGas: ${estimateGas}');
 
     // final addLiquidity = await _web3Client.call(
-    //   contract: jackRouterContract,
-    //   function: jackRouterContract.function('addLiquidity'),
+    //   contract: pancakeRouterContract,
+    //   function: pancakeRouterContract.function('addLiquidity'),
     //   params: [
     //     EthereumAddress.fromHex('0x8f92eB3b8d0D91d4F8924a041Ad94a6b6A67E5e9'),
     //     EthereumAddress.fromHex('0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd'),
@@ -351,8 +363,8 @@ class _MyHomePageState extends State<MyHomePage> {
     // print('approveReceipt: $approveReceipt');
 
     final pairAddress = await _web3Client.call(
-      contract: jackFactoryContract,
-      function: jackFactoryContract.function('getPair'),
+      contract: pancakeFactoryContract,
+      function: pancakeFactoryContract.function('getPair'),
       params: [
         EthereumAddress.fromHex('0x10ED43C718714eb63d5aA57B78B54704E256024E'),
         EthereumAddress.fromHex('0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd'),
@@ -378,8 +390,8 @@ class _MyHomePageState extends State<MyHomePage> {
     );
 
     final swapTx = await _web3Client.call(
-      contract: jackRouterContract,
-      function: jackRouterContract.function('swapExactTokensForTokens'),
+      contract: pancakeRouterContract,
+      function: pancakeRouterContract.function('swapExactTokensForTokens'),
       params: [
         amountInWei,
         BigInt.from(0),
@@ -400,8 +412,8 @@ class _MyHomePageState extends State<MyHomePage> {
     // await _web3Client.sendTransaction(
     //   EthPrivateKey.fromInt(_privateKey.value),
     //   Transaction.callContract(
-    //     contract: jackRouterContract,
-    //     function: jackRouterContract.function('swapExactTokensForTokens'),
+    //     contract: pancakeRouterContract,
+    //     function: pancakeRouterContract.function('swapExactTokensForTokens'),
     //     parameters: [
     //       amountInWei,
     //     BigInt.from(0),
