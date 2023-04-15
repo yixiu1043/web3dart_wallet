@@ -13,15 +13,13 @@ import 'dart:math' as math;
 const String API_URL = 'https://data-seed-prebsc-1-s1.binance.org:8545';
 
 const String WALLET_PATH = "m/44'/60'/0'/0/0"; // 钱包的派生路径
-const String WALLET_PATH2 = "m/44'/60'/0'/0/1"; // 钱包的派生路径
-const String WALLET_PATH3 = "m/44'/60'/0'/0/1"; // 钱包的派生路径
 
 const PancakeFactoryAddress = '0x5160f2454FcF4FC0bA5753dA1692f456fDeA5A59';
-const PancakeRouterAddress = '0x53968F853bA4413e9EE9ADA14935ee77Fece1027';
-const PancakePairAddress = '0x7220599c32a6B6D1D11488CC552f8799E6EcF53E';
-const WBNBAddress = '0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd';
-const USDTAddress = '0x337610d27c682E347C9cD60BD4b3b107C9d34dDd';
-const ERC20Address = '0x377533D0E68A22CF180205e9c9ed980f74bc5050';
+const PancakeRouterAddress = '0xC62A941586C0c844c6900b4fA03f69aD4Af198EA';
+const WBNBAddress = '0x4a3C7Edf150C5BC09A226c12A950535d0e6ddD36';
+const USDTAddress = '0x5Acb27150a396DbC18fDe7e47CE561c144F1E412';
+// const ERC20Address = '0x377533D0E68A22CF180205e9c9ed980f74bc5050';
+const YXAddress = '0x619F3033dE662e05C6b64aaA20e5230B4bD388d6';
 const WalletAddress = '0x622b7352BD13Df3216368e36d421fF9611A1a363';
 
 void main() async {
@@ -149,7 +147,7 @@ class _MyHomePageState extends State<MyHomePage> {
     const toAddress = '0x68037B698433Cf1C47645c08db18aB03538F6fd1'; // 转出地址
 
     const amountInEth = 0.01; // 0.01ETH
-    final amountInWei = EtherAmount.fromUnitAndValue(
+    final amountInWei = EtherAmount.fromBigInt(
       EtherUnit.wei,
       BigInt.from(amountInEth * math.pow(10, 18)),
     );
@@ -167,17 +165,124 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<String> _getLocalJson(String jsonName) async {
-    final json =
-        await rootBundle.loadString("assets/abi1/$jsonName.json");
+    final json = await rootBundle.loadString("assets/abi1/$jsonName.json");
     return json;
   }
 
+  void _allowance() async {
+    print(BigInt.from(DateTime.now()
+        .add(const Duration(minutes: 20))
+        .millisecondsSinceEpoch));
+
+    final erc20 = await _getLocalJson('Erc20');
+    final usdtContract = DeployedContract(
+      ContractAbi.fromJson(erc20, 'usdt'),
+      EthereumAddress.fromHex(USDTAddress),
+    );
+    final wbnbContract = DeployedContract(
+      ContractAbi.fromJson(erc20, 'bnb'),
+      EthereumAddress.fromHex(WBNBAddress),
+    );
+    final yxContract = DeployedContract(
+      ContractAbi.fromJson(erc20, 'yx'),
+      EthereumAddress.fromHex(YXAddress),
+    );
+
+    /// 查询授权
+    final allowanceUsdt = await _web3Client.call(
+      contract: usdtContract,
+      function: usdtContract.function('allowance'),
+      params: [
+        EthereumAddress.fromHex(WalletAddress),
+        EthereumAddress.fromHex(PancakeRouterAddress),
+      ],
+    );
+    final allowanceWbnb = await _web3Client.call(
+      contract: wbnbContract,
+      function: wbnbContract.function('allowance'),
+      params: [
+        EthereumAddress.fromHex(WalletAddress),
+        EthereumAddress.fromHex(PancakeRouterAddress),
+      ],
+    );
+    final allowanceYx = await _web3Client.call(
+      contract: yxContract,
+      function: yxContract.function('allowance'),
+      params: [
+        EthereumAddress.fromHex(WalletAddress),
+        EthereumAddress.fromHex(PancakeRouterAddress),
+      ],
+    );
+    print('allowanceUsdt: ${allowanceUsdt}');
+    print('allowanceWbnb: ${allowanceWbnb}');
+    print('allowanceYx: ${allowanceYx}');
+  }
+
+  void _approve() async {
+    final erc20 = await _getLocalJson('Erc20');
+    final usdtContract = DeployedContract(
+      ContractAbi.fromJson(erc20, 'usdt'),
+      EthereumAddress.fromHex(USDTAddress),
+    );
+    final wbnbContract = DeployedContract(
+      ContractAbi.fromJson(erc20, 'wbnb'),
+      EthereumAddress.fromHex(WBNBAddress),
+    );
+    final yxContract = DeployedContract(
+      ContractAbi.fromJson(erc20, 'yx'),
+      EthereumAddress.fromHex(YXAddress),
+    );
+
+    final chainId = await _web3Client.getChainId();
+    final usdtTx = await _web3Client.sendTransaction(
+      EthPrivateKey.fromInt(_privateKey.value),
+      Transaction.callContract(
+        contract: usdtContract,
+        function: usdtContract.function('approve'),
+        parameters: [
+          EthereumAddress.fromHex(PancakeRouterAddress),
+          BigInt.from(10).pow(30)
+        ],
+        value: EtherAmount.fromBigInt(EtherUnit.ether, BigInt.zero),
+      ),
+      chainId: chainId.toInt(),
+    );
+    print('Transaction hash: $usdtTx');
+
+    final wbnbTx = await _web3Client.sendTransaction(
+      EthPrivateKey.fromInt(_privateKey.value),
+      Transaction.callContract(
+        contract: wbnbContract,
+        function: wbnbContract.function('approve'),
+        parameters: [
+          EthereumAddress.fromHex(PancakeRouterAddress),
+          BigInt.from(10).pow(30)
+        ],
+        value: EtherAmount.fromBigInt(EtherUnit.ether, BigInt.zero),
+      ),
+      chainId: chainId.toInt(),
+    );
+    print('Transaction hash: $wbnbTx');
+    final yxTx = await _web3Client.sendTransaction(
+      EthPrivateKey.fromInt(_privateKey.value),
+      Transaction.callContract(
+        contract: yxContract,
+        function: wbnbContract.function('approve'),
+        parameters: [
+          EthereumAddress.fromHex(PancakeRouterAddress),
+          BigInt.from(10).pow(30)
+        ],
+        value: EtherAmount.fromBigInt(EtherUnit.ether, BigInt.zero),
+      ),
+      chainId: chainId.toInt(),
+    );
+    print('Transaction hash: $yxTx');
+  }
+
   void _swapExactETHForTokens() async {
-    /// TODO
     final chainId = await _web3Client.getChainId();
     final pancakeFactory = await _getLocalJson('PancakeFactory');
     final pancakeRouterAbi = await _getLocalJson('PancakeRouter');
-    final pancakePair = await _getLocalJson('PancakePairAddress');
 
     final pancakeFactoryContract = DeployedContract(
       ContractAbi.fromJson(pancakeFactory, 'PancakeFactory'),
@@ -188,269 +293,123 @@ class _MyHomePageState extends State<MyHomePage> {
       EthereumAddress.fromHex(PancakeRouterAddress),
     );
 
-    final pancakePairContract = DeployedContract(
-      ContractAbi.fromJson(pancakePair, 'PancakePair'),
-      EthereumAddress.fromHex(PancakePairAddress),
-    );
-
     /// 获取交易对地址
-    final pairAddress = await _web3Client.call(
-      contract: pancakeFactoryContract,
-      function: pancakeFactoryContract.function('getPair'),
-      params: [
-        EthereumAddress.fromHex(WBNBAddress),
-        EthereumAddress.fromHex(USDTAddress),
-      ],
-    );
-    print('pairAddress: ${pairAddress}');
-
-    // /// 获取交易对合约
-    // final jackPairContract = DeployedContract(
-    //   ContractAbi.fromJson(jackPair, 'jackPair'),
-    //   pairAddress[0],
+    // final pairAddress = await _web3Client.call(
+    //   contract: pancakeFactoryContract,
+    //   function: pancakeFactoryContract.function('getPair'),
+    //   params: [
+    //     EthereumAddress.fromHex(WBNBAddress),
+    //     EthereumAddress.fromHex(USDTAddress),
+    //   ],
     // );
-    //
-    // print('pairAddress: ${jackPairContract}');
-    //
+    // print('pairAddress: ${pairAddress}');
 
-    /// 获取交易对储备
-    // final reserves = await _web3Client.call(
-    //   contract: jackPairContract,
-    //   function: jackPairContract.function('getReserves'),
-    //   params: [],
+    /// 获取输出
+    // final amountsOut = await _web3Client.call(
+    //   contract: pancakeRouterContract,
+    //   function: pancakeRouterContract.function('getAmountsOut'),
+    //   params: [
+    //     BigInt.from(0.001 * math.pow(10, 18)),
+    //     [
+    //       EthereumAddress.fromHex(WBNBAddress),
+    //       EthereumAddress.fromHex(USDTAddress),
+    //     ]
+    //   ],
     // );
+    // print('getAmountsOut: ${amountsOut}');
 
-    return;
     final amountIn = EtherAmount.fromBigInt(
-      EtherUnit.ether,
-      BigInt.from(0.01),
+      EtherUnit.wei,
+      BigInt.from(10).pow(10),
     );
+    final amountOutMin = BigInt.zero;
 
-    final amountOutMin = BigInt.from(100 * math.pow(10, 18));
-    print('amountOutMin: ${amountOutMin}');
-    // try {
-    //   final tx = await _web3Client.call(
-    //     contract: pancakeRouterContract,
-    //     function: pancakeRouterContract.function('swapExactETHForTokens'),
-    //     params: [
-    //       amountOutMin,
-    //       [
-    //         EthereumAddress.fromHex(
-    //             '0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd'),
-    //         EthereumAddress.fromHex(
-    //             '0x8f92eB3b8d0D91d4F8924a041Ad94a6b6A67E5e9'),
-    //       ],
-    //       EthereumAddress.fromHex('0x622b7352BD13Df3216368e36d421fF9611A1a363'),
-    //       BigInt.from(DateTime.now()
-    //           .add(const Duration(minutes: 20))
-    //           .millisecondsSinceEpoch),
-    //     ],
-    //   );
-    //   print('Transaction hash: ${tx[0].hash}');
-    //   final swapReceipt = await tx[0].wait();
-    //   print('swapReceipt: $swapReceipt');
-    // } catch (error, trace) {
-    //   print(error);
-    //   print(trace);
-    // }
-    try {
-      final tx = await _web3Client.sendTransaction(
-        EthPrivateKey.fromInt(_privateKey.value),
-        Transaction.callContract(
-          contract: pancakeRouterContract,
-          function: pancakeRouterContract.function('swapExactETHForTokens'),
-          parameters: [
-            amountOutMin,
-            [
-              EthereumAddress.fromHex(
-                  '0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd'),
-              EthereumAddress.fromHex(
-                  '0x8f92eB3b8d0D91d4F8924a041Ad94a6b6A67E5e9'),
-            ],
-            EthereumAddress.fromHex(
-                '0x622b7352BD13Df3216368e36d421fF9611A1a363'),
-            BigInt.from(DateTime.now()
-                .add(const Duration(minutes: 20))
-                .millisecondsSinceEpoch),
+    final tx = await _web3Client.sendTransaction(
+      EthPrivateKey.fromInt(_privateKey.value),
+      Transaction.callContract(
+        contract: pancakeRouterContract,
+        function: pancakeRouterContract.function('swapExactETHForTokens'),
+        parameters: [
+          amountOutMin,
+          [
+            EthereumAddress.fromHex(WBNBAddress),
+            EthereumAddress.fromHex(USDTAddress),
           ],
-          value: amountIn,
-        ),
-        chainId: chainId.toInt(),
-      );
-      // pairAddress: [0x284a7b83a10b0d91dc64ab04574507294fbf2acd]
-      // reserves: [10891949504848443278689669, 745497565636525320, 1680942752]
-      //  amountOutMin: 7766279631452241920
-      // Transaction hash: 0x55df6b6e7134040721b9e34ae44e12409420e696f89638d5b2ce2c5caba3b1df
-      // balance ----- 143984.69095942142
-      print('Transaction hash: $tx');
-    } catch (error, trace) {
-      print(error);
-      print(trace);
-    }
+          EthereumAddress.fromHex(WalletAddress),
+          BigInt.from(DateTime.now()
+              .add(const Duration(minutes: 20))
+              .millisecondsSinceEpoch),
+        ],
+        value: amountIn,
+      ),
+      chainId: chainId.toInt(),
+    );
+    print('Transaction hash: $tx');
+
     showAlertDialog();
     _getBalance(_address);
   }
 
   void _swapExactTokensForTokens() async {
-    /// TODO
-    // final chainId = await _web3Client.getChainId();
+    final chainId = await _web3Client.getChainId();
     final pancakeRouter = await _getLocalJson('PancakeRouter');
-    final erc20 = await _getLocalJson('erc20');
-    final pancakeFactory = await _getLocalJson('PancakeFactory');
-    final jackPair = await _getLocalJson('jackPair');
 
     final pancakeRouterContract = DeployedContract(
       ContractAbi.fromJson(pancakeRouter, 'PancakeRouter'),
-      EthereumAddress.fromHex('0x10ED43C718714eb63d5aA57B78B54704E256024E'),
-    );
-    final erc20Contract = DeployedContract(
-      ContractAbi.fromJson(erc20, 'erc20'),
-      EthereumAddress.fromHex('0x8f92eB3b8d0D91d4F8924a041Ad94a6b6A67E5e9'),
-    );
-    final pancakeFactoryContract = DeployedContract(
-      ContractAbi.fromJson(pancakeFactory, 'PancakeFactory'),
-      EthereumAddress.fromHex('0x6725f303b657a9451d8ba641348b6761a6cc7a17'),
+      EthereumAddress.fromHex(PancakeRouterAddress),
     );
 
-    /// 查询授权
-    final allowanceErc20 = await _web3Client.call(
-      contract: erc20Contract,
-      function: erc20Contract.function('allowance'),
-      params: [
-        EthereumAddress.fromHex('0x622b7352BD13Df3216368e36d421fF9611A1a363'),
-        EthereumAddress.fromHex('0xd99d1c33f9fc3444f8101754abc46c52416550d1'),
-      ],
-    );
+    final amountIn = BigInt.from(10).pow(10);
 
-    print('allowanceErc20: ${allowanceErc20}');
-
-    final estimateGas = await _web3Client.estimateGas();
-
-    print('estimateGas: ${estimateGas}');
-
-    // final addLiquidity = await _web3Client.call(
-    //   contract: pancakeRouterContract,
-    //   function: pancakeRouterContract.function('addLiquidity'),
-    //   params: [
-    //     EthereumAddress.fromHex('0x8f92eB3b8d0D91d4F8924a041Ad94a6b6A67E5e9'),
-    //     EthereumAddress.fromHex('0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd'),
-    //     estimateGas,
-    //     estimateGas,
-    //     estimateGas,
-    //     estimateGas,
-    //     EthereumAddress.fromHex('0xd99d1c33f9fc3444f8101754abc46c52416550d1'),
-    //     BigInt.from(
-    //         DateTime.now().add(const Duration(days: 1)).millisecondsSinceEpoch),
-    //   ],
-    // );
-
-    // print('addLiquidity: ${addLiquidity}');
-
-    final approveTx = await _web3Client.call(
-      contract: erc20Contract,
-      function: erc20Contract.function('approve'),
-      params: [
-        EthereumAddress.fromHex('0xd99d1c33f9fc3444f8101754abc46c52416550d1'),
-        estimateGas
-      ],
-    );
-
-    print('Transaction hash: ${approveTx[0].hash}');
-
-    return;
-
-    // final approveReceipt = await approveTx[0].wait();
-    // print('approveReceipt: $approveReceipt');
-
-    final pairAddress = await _web3Client.call(
-      contract: pancakeFactoryContract,
-      function: pancakeFactoryContract.function('getPair'),
-      params: [
-        EthereumAddress.fromHex('0x10ED43C718714eb63d5aA57B78B54704E256024E'),
-        EthereumAddress.fromHex('0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd'),
-      ],
-    );
-    final jackPairContract = DeployedContract(
-      ContractAbi.fromJson(jackPair, 'jackPair'),
-      EthereumAddress.fromHex(pairAddress[0]),
-    );
-
-    final reserves = await _web3Client.call(
-      contract: jackPairContract,
-      function: jackPairContract.function('getReserves'),
-      params: [],
-    );
-
-    print('reserves: ${reserves}');
-
-    const usdtAmount = 10;
-    final amountInWei = EtherAmount.fromUnitAndValue(
-      EtherUnit.wei,
-      BigInt.from(usdtAmount * math.pow(10, 18)),
-    );
-
-    final swapTx = await _web3Client.call(
-      contract: pancakeRouterContract,
-      function: pancakeRouterContract.function('swapExactTokensForTokens'),
-      params: [
-        amountInWei,
-        BigInt.from(0),
-        [
-          EthereumAddress.fromHex('0x8f92eB3b8d0D91d4F8924a041Ad94a6b6A67E5e9'),
-          EthereumAddress.fromHex('0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd'),
+    final tx = await _web3Client.sendTransaction(
+      EthPrivateKey.fromInt(_privateKey.value),
+      Transaction.callContract(
+        contract: pancakeRouterContract,
+        function: pancakeRouterContract.function('swapExactTokensForTokens'),
+        parameters: [
+          amountIn,
+          BigInt.zero,
+          [
+            EthereumAddress.fromHex(USDTAddress),
+            EthereumAddress.fromHex(YXAddress),
+          ],
+          EthereumAddress.fromHex(WalletAddress),
+          BigInt.from(DateTime.now()
+              .add(const Duration(minutes: 20))
+              .millisecondsSinceEpoch),
         ],
-        EthereumAddress.fromHex('0x622b7352BD13Df3216368e36d421fF9611A1a363'),
-        BigInt.from(
-            DateTime.now().add(const Duration(days: 1)).millisecondsSinceEpoch),
-      ],
+      ),
+      chainId: chainId.toInt(),
     );
 
-    print('Transaction hash: ${swapTx[0].hash}');
-    final swapReceipt = await swapTx[0].wait();
-    print('swapReceipt: $swapReceipt');
-
-    // await _web3Client.sendTransaction(
-    //   EthPrivateKey.fromInt(_privateKey.value),
-    //   Transaction.callContract(
-    //     contract: pancakeRouterContract,
-    //     function: pancakeRouterContract.function('swapExactTokensForTokens'),
-    //     parameters: [
-    //       amountInWei,
-    //     BigInt.from(0),
-    //       [
-    //         EthereumAddress.fromHex(
-    //             '0x8f92eB3b8d0D91d4F8924a041Ad94a6b6A67E5e9'),
-    //         EthereumAddress.fromHex(
-    //             '0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd'),
-    //       ],
-    //       EthereumAddress.fromHex('0x622b7352BD13Df3216368e36d421fF9611A1a363'),
-    //       BigInt.from(DateTime.now()
-    //           .add(const Duration(days: 1))
-    //           .millisecondsSinceEpoch),
-    //     ],
-    //     value: amountInWei,
-    //   ),
-    //   chainId: chainId.toInt(),
-    // );
+    print('Transaction hash: $tx');
     showAlertDialog();
     _getBalance(_address);
   }
 
   void _getTokensBalance() async {
-    final erc20 = await _getLocalJson('erc20');
-    final contract = DeployedContract(
-      ContractAbi.fromJson(erc20, 'erc20'),
-      EthereumAddress.fromHex('0x8f92eB3b8d0D91d4F8924a041Ad94a6b6A67E5e9'),
+    final erc20 = await _getLocalJson('Erc20');
+    final usdtContract = DeployedContract(
+      ContractAbi.fromJson(erc20, 'usdt'),
+      EthereumAddress.fromHex(USDTAddress),
     );
-    final balance = await _web3Client.call(
-      contract: contract,
-      function: contract.function('balanceOf'),
-      params: [
-        EthereumAddress.fromHex('0x622b7352BD13Df3216368e36d421fF9611A1a363')
-      ],
+    final yxContract = DeployedContract(
+      ContractAbi.fromJson(erc20, 'yx'),
+      EthereumAddress.fromHex(YXAddress),
+    );
+    final usdtBalance = await _web3Client.call(
+      contract: usdtContract,
+      function: usdtContract.function('balanceOf'),
+      params: [EthereumAddress.fromHex(WalletAddress)],
+    );
+    final yxBalance = await _web3Client.call(
+      contract: yxContract,
+      function: yxContract.function('balanceOf'),
+      params: [EthereumAddress.fromHex(WalletAddress)],
     );
 
-    print('balance ----- ${balance[0] / BigInt.from(math.pow(10, 18))}');
+    print('usdtBalance ----- ${usdtBalance[0] / BigInt.from(math.pow(10, 18))}');
+    print('usdtBalance ----- ${yxBalance[0] / BigInt.from(math.pow(10, 18))}');
   }
 
   void showAlertDialog() {
@@ -534,6 +493,14 @@ class _MyHomePageState extends State<MyHomePage> {
                 ElevatedButton(
                   onPressed: _sendTransaction,
                   child: const Text('转出'),
+                ),
+                ElevatedButton(
+                  onPressed: _allowance,
+                  child: const Text('查询授权'),
+                ),
+                ElevatedButton(
+                  onPressed: _approve,
+                  child: const Text('授权'),
                 ),
                 ElevatedButton(
                   onPressed: _swapExactETHForTokens,
