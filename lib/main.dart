@@ -5,6 +5,7 @@ import 'package:example/utils/store.dart';
 import 'package:example/utils/utils.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart';
 import 'package:sp_util/sp_util.dart';
 import 'package:web3dart/crypto.dart';
@@ -173,6 +174,11 @@ class _MyHomePageState extends State<MyHomePage> {
     print('usdtBalance ----- ${yxBalance[0] / BigInt.from(math.pow(10, 18))}');
   }
 
+  void _copyInClipboard(String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    showAlertDialog();
+  }
+
   void showAlertDialog() {
     showDialog<void>(
       context: context,
@@ -232,6 +238,11 @@ class _MyHomePageState extends State<MyHomePage> {
                     '你的私钥：${bytesToHex(intToBytes(_privateKey.value))}',
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
+                  ElevatedButton(
+                    onPressed: () => _copyInClipboard(
+                        bytesToHex(intToBytes(_privateKey.value))),
+                    child: const Text('复制私钥'),
+                  ),
                   Text(
                     '你的公钥：${bytesToHex(_getPublicKey(_privateKey).value)}',
                     style: Theme.of(context).textTheme.headlineSmall,
@@ -239,6 +250,10 @@ class _MyHomePageState extends State<MyHomePage> {
                   Text(
                     '你的钱包地址：$_address',
                     style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  ElevatedButton(
+                    onPressed: () => _copyInClipboard(_address),
+                    child: const Text('复制钱包地址'),
                   ),
                   Text(
                     '你的BNB余额：$_balance',
