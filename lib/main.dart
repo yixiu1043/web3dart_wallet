@@ -1,5 +1,6 @@
 import 'package:example/const/address.dart';
 import 'package:example/pages/swap_page.dart';
+import 'package:example/pages/transaction_page.dart';
 import 'package:example/pages/transfer_page.dart';
 import 'package:example/utils/store.dart';
 import 'package:example/utils/utils.dart';
@@ -124,11 +125,11 @@ class _MyHomePageState extends State<MyHomePage> {
     return wallet.ethereum.createPublicKey(privateKey);
   }
 
+  /// 生成钱包地址
   String _getWalletAddress(wallet.PublicKey publicKey) {
     return wallet.ethereum.createAddress(publicKey);
   }
 
-  /// 生成钱包地址
   Web3Client _getWeb3Client(wallet.PrivateKey privateKey, String apiUrl) {
     return Web3Client(apiUrl, Client());
   }
@@ -296,6 +297,15 @@ class _MyHomePageState extends State<MyHomePage> {
                               builder: (context) => const SwapPage()));
                     },
                     child: const Text('闪兑'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const TransactionPage()));
+                    },
+                    child: const Text('查看最近交易记录'),
                   ),
                 ],
               ),
